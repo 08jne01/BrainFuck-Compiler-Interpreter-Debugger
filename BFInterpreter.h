@@ -15,12 +15,13 @@ private:
 	void updateConsole();
 	void updateMemWin();
 	void updateTextWin();
+	void addCharTextWin(char c, bool highlight);
 	void runSource();
 	void runSourceSingleStep();
 	void singleStep();
 	void inputSource(char* fileName);
 	void zeroMem();
-	bool handleKey(char c);
+	int handleKey(char c);
 
 	std::string m_fileText;
 	std::string m_fileName;
@@ -35,6 +36,10 @@ private:
 	int m_memIndex = 0;
 	int m_maxMemIndex = 0;
 	int m_stopIP = 0;
+	
+	int m_currentLine = 1;
+	int m_currentMemLine = 0;
+
 	std::vector<int> m_originalIndices;
 	std::vector<LoopPair> m_pairs;
 	std::vector<int> m_loopOpen;
@@ -49,6 +54,9 @@ private:
 	bool m_done = false;
 	bool m_continue = false;
 	int m_singleStepIP = 0;
+	
+	const int m_memWinWidth = 47;
+	const int m_consoleWinHeight = 5;
 
 	WINDOW* memWin;
 	WINDOW* textWin;

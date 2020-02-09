@@ -178,31 +178,40 @@ void BFInterpreter::initCurses()
 	keypad(stdscr, TRUE);
 	int h, w;
 	getmaxyx(stdscr, h, w);//43
-	memWin = newwin(h-6, 47, 0, w - 47);
-	textWin = newwin(h-6, w-49, 0, 0);
-	consoleWin = newwin(5, w, h-5, 0); 
+	memWin = newwin(h-(m_consoleWinHeight + 1), m_memWinWidth, 0, w - m_memWinWidth);
+	textWin = newwin(h-(m_consoleWinHeight+1), w-(m_memWinWidth + 2), 0, 0);
+	consoleWin = newwin(m_consoleWinHeight, w, h-m_consoleWinHeight, 0); 
 	start_color();
 	init_pair(1, COLOR_GREEN, COLOR_BLACK);
 	init_pair(2, COLOR_BLUE, COLOR_BLACK);
 	init_pair(3, COLOR_RED, COLOR_BLACK);
+	init_pair(4, COLOR_YELLOW, COLOR_BLACK);
+	init_pair(5, COLOR_CYAN, COLOR_BLACK);
 }
 
 void BFInterpreter::updateMemWin()
 {
 	int h, w;
+	getmaxyx(stdscr, h, w);
+	h = h - (m_consoleWinHeight+1);
+	wresize(memWin, h, m_memWinWidth);
+	mvwin(memWin, 0, w-m_memWinWidth);
+
 	getmaxyx(memWin, h, w);
 	
 	m_maxMemIndex = m_maxMemIndex < m_memIndex ? m_memIndex : m_maxMemIndex;
 
-	for (int i = 0; i < h; i++)
+	wmove(memWin, 1, 0);
+	wprintw(memWin, "(x)down, (z)up\n");
+	for (int i = 0; i <= h; i++)
 	{
 		unsigned char c;
 		char actual[9] = "........";
-		wmove(memWin, i, 0);
-		wprintw(memWin, "0x%08x: ",8*i);
+		wmove(memWin, i+2, 0);
+		wprintw(memWin, "0x%08x: ",8*(i+m_currentMemLine));
 		for (int j = 0; j < 8; j++)
 		{
-			int index = i*8 + j;
+			int index = (i+m_currentMemLine)*8 + (j);
 			if (index >= m_mem.size() || m_mem.size() < 0)
 			{
 				c = (unsigned char)0;
@@ -239,6 +248,7 @@ void BFInterpreter::updateMemWin()
 
 		}
 		wprintw(memWin, "|%s|", actual);
+		wclrtobot(memWin);
 		//wprintw(memWin, "%s", actual.c_str());
 		//wprintw(memWin, "%s ", "|........|");
 		//wattron(memWin, A_BOLD);
@@ -259,35 +269,108 @@ void BFInterpreter::updateTextWin()
 {
 	//wprintw(textWin,
 	int h, w;
+	getmaxyx(stdscr, h, w);
+	h = h - (m_consoleWinHeight+1);
+	w = w - (m_memWinWidth + 2);
+	wresize(textWin, h, w);
+	mvwin(textWin, 0, 0);
+
 	getmaxyx(textWin, h, w);
 	wmove(textWin, 0,0);
+	int fakeX = 0;
+	int fakeY = m_currentLine-1;
+	for (int i = 0; i < m_currentLine; i++)
+	{
+		//wmove(textWin,i,0);
+		wprintw(textWin, "\n");
+		//wclrtoeol(textWin);
+	}
+	//wmove(textWin, 0,0);
+	
 	int index = m_originalIndices[m_singleStepIP];
+
 	for (int i = 0; i < m_original.size(); i++)
 	{
-		if (index == i)
+		fakeX++;
+		bool newline = fakeX >= w || m_original[i] == '\n';
+		fakeY += newline ? 1 : 0;
+		fakeX = newline ? 0 : fakeX;
+		if (fakeY < 0 || fakeY >= (h-1) || fakeX < 0 || fakeX >= w)
 		{
-			wattron(textWin, A_STANDOUT);
-			waddch(textWin, m_original[i]);
-			wattroff(textWin, A_STANDOUT);
-		}
-		else if (!isInstruction(m_original[i]))
-		{
-			wattron(textWin, COLOR_PAIR(1));
-			waddch(textWin, m_original[i]);
-			wattroff(textWin, COLOR_PAIR(1));
+			//wclrtoeol(textWin);
+			continue;
 		}
 		else
 		{
-			waddch(textWin, m_original[i]);
+			//wmove(textWin, fakeY, fakeX);
 		}
+		
+		addCharTextWin(m_original[i], index==i);
 	}
+	wclrtobot(textWin);
+
+	//wmove(textWin, 0,0);
+	//h = m_currentLine;
+	//for (int i = 0; h >= 0 && h < m_currentLine+1; i++)
+	//{
+	//	//getyx(textWin, h, w);
+	//	addCharTextWin(m_original[i], index == i);
+	//	getyx(textWin, h, w);
+	//}
+
 	//wprintw(textWin,"%s", m_original.c_str());
 	wrefresh(textWin);
+}
+
+void BFInterpreter::addCharTextWin(char c, bool highlight)
+{
+	if (highlight)
+	{
+	        wattron(textWin, A_STANDOUT);
+	        waddch(textWin, c);
+	        wattroff(textWin, A_STANDOUT);
+	}
+	else if (!isInstruction(c))
+	{
+        	wattron(textWin, COLOR_PAIR(1));
+        	waddch(textWin, c);
+        	wattroff(textWin, COLOR_PAIR(1));
+	}
+	else
+	{
+	        if (c == '[' || c == ']')
+       		{
+	                wattron(textWin, COLOR_PAIR(4));
+	                waddch(textWin, c);
+	                wattroff(textWin, COLOR_PAIR(4));
+	        }
+	        else if (c == '>' || c == '<')
+	        {
+	                wattron(textWin, COLOR_PAIR(3));
+	                waddch(textWin, c);
+	                wattroff(textWin, COLOR_PAIR(3));
+	        }
+	        else if (c == ',' || c == '.')
+	        {
+	                wattron(textWin, COLOR_PAIR(5));
+	                waddch(textWin, c);
+	                wattroff(textWin, COLOR_PAIR(5));
+	        }
+	        else
+	        {
+	                waddch(textWin, c);
+	        }
+	}	
 }
 
 void BFInterpreter::updateConsole()
 {
 	int h, w;
+	getmaxyx(stdscr, h, w);
+	//h = m_consoleWinHeight;
+	wresize(consoleWin, m_consoleWinHeight, w);
+	mvwin(consoleWin, h - m_consoleWinHeight, 0);
+
 	getmaxyx(consoleWin, h,w);
 	int y, x;
 	getyx(consoleWin, y, x);
@@ -296,7 +379,7 @@ void BFInterpreter::updateConsole()
 	{
 		waddch(consoleWin,'_');
 	}
-	wprintw(consoleWin, "(s)tep, (l)oop, (r)eload, (e)xit");
+	wprintw(consoleWin, "(s)tep, (l)oop, (f)ast, (n)ormal, (q)up, (a)down, (r)eload, (e)xit");
 	if (m_done)
 	{
 		wprintw(consoleWin, "     %s finished; (r)estart", m_fileName.c_str());
@@ -306,6 +389,7 @@ void BFInterpreter::updateConsole()
 	{
 		wmove(consoleWin, y, x);
 	}
+	
 	wrefresh(consoleWin);//do this first as it refreshes the whole screen
 }
 
@@ -317,7 +401,7 @@ void BFInterpreter::updateWindows()
 	updateConsole();
 }
 
-bool BFInterpreter::handleKey(char c)
+int BFInterpreter::handleKey(char c)
 {
 	switch (c)
 	{
@@ -326,19 +410,51 @@ bool BFInterpreter::handleKey(char c)
 		{
 			m_stopIP = m_openBracketsStack.back();
 			m_continue = m_stopIP > 0;
+			if (m_continue)
+			{
+				cbreak();
+			}
+			nodelay(stdscr, m_continue);
 		}
 		else
 		{
 			m_stopIP = m_singleStepIP + 1;
 		}
-		return false;
+		return 1;
 	case 'e':
 		m_exit = true;
-		return true;
+		return 2;
 	case 'r':
-		return true;
+		return 2;
+	case 's':
+		return 1;
+	case 'x':
+		m_currentMemLine++;
+		return 0;
+	case 'z':
+		m_currentMemLine--;
+		return 0;
+	case 'q':
+		m_currentLine++;
+		return 0;
+	case 'a':
+		m_currentLine--;
+		return 0;
+	case 'f':
+		m_continue = !m_continue;
+		cbreak();
+		nodelay(stdscr, m_continue);
+		return 1;
+	case 'n':
+		m_continue = !m_continue;
+		nodelay(stdscr, 0);
+		if (m_continue)
+		{
+			halfdelay(1);
+		}
+		return 1;
 	default:
-		return false;
+		return 0;
 	}
 }
 
@@ -356,6 +472,7 @@ void BFInterpreter::runSourceSingleStep()
 		if (m_stopIP == m_singleStepIP)
 		{
 			m_continue = false;
+			nodelay(stdscr, 0);
 		}
 
 
@@ -364,18 +481,26 @@ void BFInterpreter::runSourceSingleStep()
         		//wprintw(consoleWin, "p%i ", -m_openBracketsStack.back());
         		m_openBracketsStack.pop_back();
 		}
+		int ch = 0;
 		if (!m_continue)
 		{
-			int ch = 0;
-			while (ch != 's' && ch != 'l' && ch != 'e' && ch != 'r')
+			int eventType = 0;
+			do
 			{
 				ch = getch();
+				//updateWindows();
+				eventType = handleKey(ch);
 				updateWindows();
-			}
-			if (handleKey(ch))
+			} while (!eventType);
+			if (eventType == 2)
 			{
 				return;
 			}
+		}
+		else
+		{
+			ch = getch();
+			handleKey(ch);
 		}
 		singleStep();
 		//if (m_fileText[m_singleStepIP] == ']')
@@ -401,6 +526,8 @@ void BFInterpreter::runSourceSingleStep()
 	//wprintw(consoleWin, "%s", stopIP);
 	//wrefresh(consoleWin);
 	int ch = 0;
+	cbreak();
+	nodelay(stdscr, 0);
 	while (ch != 'r')
 	{
 		ch = getch();
