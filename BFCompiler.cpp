@@ -3,17 +3,18 @@
 #include <iostream>
 #include <fstream>
 
-BFCompiler::BFCompiler(char* fileName, bool keepASM, bool debug):
-m_keepASM(keepASM), m_debug(debug)
+BFCompiler::BFCompiler(char* fileName, bool keepASM, bool debug, bool is64Bit):
+m_keepASM(keepASM), m_debug(debug), m_is64Bit(is64Bit)
 {
 	inputSource(fileName);
+	m_reg = is64Bit ? "r" : "e";
 }
 
 void BFCompiler::inputSource(char* fileName)
 {
 	m_fileName = fileName;
 	BFFileHandler fileHandler(m_fileName, m_fileText);
-	fileHandler.loadFile();
+	//fileHandler.loadFile();
 	fileHandler.checkErrorsAndParse();
 	if (!fileHandler.parseSuccess())
 	{
@@ -180,14 +181,29 @@ void BFCompiler::assemble()
 	{
 		return;
 	}
-	std::string command = "nasm -f elf32 ";
-	command += m_outputFileName + ".asm";
-	system(command.c_str());
-	command = "ld -m elf_i386 -s -o ";
-	command += m_outputFileName + " " + m_outputFileName + ".o";
-	system(command.c_str());
-	command = "rm ";
-	command += m_outputFileName + ".o";
+	std::string command = "";
+	if (!m_is64Bit)
+	{
+		command = "nasm -f elf32 ";
+		command += m_outputFileName + ".asm";
+		system(command.c_str());
+		command = "ld -m elf_i386 -s -o ";
+		command += m_outputFileName + " " + m_outputFileName + ".o";
+		system(command.c_str());
+		command = "rm ";
+		command += m_outputFileName + ".o";
+	}
+	else
+	{
+		command = "nasm -f elf64 ";
+		command += m_outputFileName + ".asm";
+		system(command.c_str());
+		command = "ld -s -o ";
+		command += m_outputFileName + " " + m_outputFileName + ".o";
+		system(command.c_str());
+		command = "rm ";
+		command += m_outputFileName + ".o";
+	}
 	if (!m_keepASM)
 	{
 		command += " " + m_outputFileName + ".asm";
@@ -201,61 +217,75 @@ void BFCompiler::setupASM()
 	m_outputAssembly += "section .text\n\tglobal _start\n_start:\n";
 	m_outputAssembly += \ 
 "\
-	push ebp\n\
-	mov ebp, esp\n\
-	mov eax, 0\n\
+	push " + m_reg +"bp\n\
+	mov " + m_reg + "bp, " + m_reg +"sp\n\
+	mov " + m_reg + "ax, 0\n\
 .fillZero:\n\
-	mov [esp], byte 0\n\
-	inc eax\n\
-	dec esp\n\
-	cmp eax, 500000; zero out about 500KB\n\
+	mov [" + m_reg + "sp], byte 0\n\
+	inc " + m_reg + "ax\n\
+	dec " + m_reg + "sp\n\
+	cmp "+ m_reg +"ax, 500000; zero out about 500KB\n\
 	jg .done\n\
 	jmp .fillZero\n\
 .done:\n\
-	mov esp, ebp\n\n\
+	mov " + m_reg + "sp, " + m_reg + "bp\n\n\
 ";
 }
 
 void BFCompiler::finishASM()
 {
-	m_outputAssembly += "\n\n\tpop ebp\n\tmov eax, 1\n\tmov ebx, 0\n\tint 0x80";
+	m_outputAssembly += "\n\n\tpop " + m_reg + "bp\n\tmov "+m_reg+"ax, 1\n\tmov "+m_reg+"bx, 0\n\tint 0x80";
 }
 
 //Special compiler/interpreter instruction to optimise zeroing loops
 void BFCompiler::writeValueZero()
 {
-	m_outputAssembly += "\tmov [esp], byte 0\n";
+	m_outputAssembly += "\tmov ["+m_reg+"sp], byte 0\n";
 }
 
 //Increment the stack pointer
 void BFCompiler::incrementSP(int v)
 {
-	m_outputAssembly += v > 1 ? "\tadd esp, " + std::to_string(v) + "\n" : "\tinc esp\n";
+	m_outputAssembly += v > 1 ? "\tadd "+m_reg+"sp, " + std::to_string(v) + "\n" : "\tinc "+m_reg+"sp\n";
 }
 //Decrement the stack pointer
 void BFCompiler::decrementSP(int v)
 {
-	m_outputAssembly += v > 1 ? "\tadd esp, " + std::to_string(-v) + "\n" : "\tdec esp\n";
+	m_outputAssembly += v > 1 ? "\tadd "+m_reg+"sp, " + std::to_string(-v) + "\n" : "\tdec "+m_reg+"sp\n";
 }
 //Increment the value at the current stack location
 void BFCompiler::incrementValue(int v)
 {
-	m_outputAssembly += v > 1 ? "\tadd byte [esp], " + std::to_string(v) + "\n" :  "\tinc byte [esp]\n";
+	m_outputAssembly += v > 1 ? "\tadd byte ["+m_reg+"sp], " + std::to_string(v) + "\n" :  "\tinc byte ["+m_reg+"sp]\n";
 }
 //Decrement the value at the current stack location
 void BFCompiler::decrementValue(int v)
 {
-	m_outputAssembly += v > 1 ? "\tadd byte [esp], " + std::to_string(-v) + "\n" : "\tdec byte [esp]\n";
+	m_outputAssembly += v > 1 ? "\tadd byte ["+m_reg+"sp], " + std::to_string(-v) + "\n" : "\tdec byte ["+m_reg+"sp]\n";
 }
 //Print one byte to console as ascii char
 void BFCompiler::outputChar()
 {
-	m_outputAssembly += "\tmov eax, 4\n\tmov ebx, 1\n\tmov ecx, esp\n\tmov edx, 1\n\tint 0x80\n";
+	if (m_is64Bit)
+	{
+		m_outputAssembly += "\tmov rax, 1\n\tmov rdi, 1\n\tmov rsi, 1\n\t mov rsi, rsp\n\tmov rdx, 1\n\tsyscall\n";
+	}
+	else
+	{
+		m_outputAssembly += "\tmov eax, 4\n\tmov ebx, 1\n\tmov ecx, esp\n\tmov edx, 1\n\tint 0x80\n";
+	}
 }
 //Read one key press as a char into the current stack location
 void BFCompiler::readKeyInput()
 {
-	m_outputAssembly += "\tmov eax, 3\n\tmov ebx, 0\n\tmov ecx, esp\n\tmov edx, 1\n\tint 0x80\n";
+	if (m_is64Bit)
+	{
+		m_outputAssembly += "\txor rax, rax\n\txor rdi, rdi\n\tmov rsi, rsp\n\tmov rdx, 1\n\tsyscall\n";
+	}
+	else
+	{
+		m_outputAssembly += "\tmov eax, 3\n\tmov ebx, 0\n\tmov ecx, esp\n\tmov edx, 1\n\tint 0x80\n";
+	}
 }
 //Open Bracket if byte is zero jump to closing bracket
 void BFCompiler::openBracket()
@@ -263,7 +293,7 @@ void BFCompiler::openBracket()
 	std::string current = std::to_string(m_currentBracket);
 	m_outputAssembly += ".loop";
 	m_outputAssembly += current;
-	m_outputAssembly += ":\n\tcmp byte [esp], 0\n\tje .loop";
+	m_outputAssembly += ":\n\tcmp byte ["+m_reg+"sp], 0\n\tje .loop";
 	m_outputAssembly += current;
 	m_outputAssembly += "End\n";
 	m_bracketID.push_back(m_currentBracket);
@@ -278,7 +308,7 @@ void BFCompiler::closeBracket()
 	std::string current = std::to_string(id);
 	m_outputAssembly += ".loop";
 	m_outputAssembly += current;
-	m_outputAssembly += "End:\n\tcmp byte [esp], 0\n\tjne .loop";
+	m_outputAssembly += "End:\n\tcmp byte ["+m_reg+"sp], 0\n\tjne .loop";
 	m_outputAssembly += current;
 	m_outputAssembly += '\n';
 }

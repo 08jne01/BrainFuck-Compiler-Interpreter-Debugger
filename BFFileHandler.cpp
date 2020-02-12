@@ -2,11 +2,11 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include "BFParser.h"
 
-bool isInstruction(char c)
-{
-	return c == '<' || c == '>' || c == '+' || c == '-' || c == '.' || c == ',' || c == '[' || c == ']';	
-}
+
+	
+
 
 bool isSpecialInstruction(char c)
 {
@@ -21,6 +21,7 @@ m_fileName(fileName), m_fileText(fileText)
 
 void BFFileHandler::loadFile()
 {
+	std::cout << "Loading file" << std::endl;
 	std::ifstream file(m_fileName);
 	std::stringstream stream;
 	if (file.is_open())
@@ -33,7 +34,10 @@ void BFFileHandler::loadFile()
 	{
 		m_errors.push_back(Error(0, FILE_NOT_FOUND));
 	}
-	
+
+	BFParser parser(m_fileText);
+	parser.tokenise();
+	parser.parse();
 	//std::string instructions = "";
 	//m_fileWithFormatting = m_fileText;
 //	for (int i = 0; i < m_fileText.size(); i++)

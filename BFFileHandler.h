@@ -4,7 +4,7 @@
 #ifndef BFFILEHANDLER_H
 #define BFFILEHANDLER_H
 
-extern bool isInstruction(char c);
+
 extern bool isSpecialInstruction(char c);
 
 enum ErrorReason

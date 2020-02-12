@@ -1,6 +1,7 @@
 #include "BFInterpreter.h"
 #include <iostream>
 #include <ctype.h>
+#include "BFParser.h"
 BFInterpreter::BFInterpreter(char* fileName, bool singleStep, bool debug):
 m_singleStep(singleStep), m_debug(debug)
 {
@@ -30,7 +31,7 @@ void BFInterpreter::inputSource(char* fileName)
 {
 	m_fileName = fileName;
 	BFFileHandler fileHandler(m_fileName, m_fileText);
-	fileHandler.loadFile();
+	//fileHandler.loadFile();
 	fileHandler.checkErrorsAndParse();
 	if (!fileHandler.parseSuccess())
 	{

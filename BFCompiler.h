@@ -3,7 +3,7 @@
 class BFCompiler
 {
 public:
-	BFCompiler(char* fileName, bool keepASM, bool debug);
+	BFCompiler(char* fileName, bool keepASM, bool debug, bool is64Bit);
 	void translate();
 	void assemble();
 	bool succeeded();
@@ -31,6 +31,7 @@ private:
 	int m_currentBracket = 0;
 	const bool m_keepASM;
 
+	std::string m_reg = "e";
 
 	std::string m_fileText;
 	std::string m_fileName;
@@ -40,6 +41,7 @@ private:
 	std::vector<int> m_bracketID;
 	bool m_failed = false;
 	bool m_debug = false;
+	bool m_is64Bit = false;
 };
 
 inline bool BFCompiler::succeeded()

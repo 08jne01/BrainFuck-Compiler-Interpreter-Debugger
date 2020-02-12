@@ -11,6 +11,7 @@ static void printHelp()
 	std::cout << "-i -> run file in the interpreter" << std::endl;
 	std::cout << "-s -> if running as interpreter this will enter single step mode" << std::endl;
 	std::cout << "-d -> debug, no optimisation" << std::endl;
+	std::cout << "-a64 -> 64 bit architecture" << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -25,6 +26,7 @@ int main(int argc, char** argv)
 	bool fileNameSet = false;
 	bool keepASM = false;
 	bool debug = false;
+	bool is64 = false;
 	for (int i = 1; i < argc; i++)
 	{
 
@@ -60,11 +62,15 @@ int main(int argc, char** argv)
 		{
 			debug = true;
 		}
+		else if (strcmp("-a64", argv[i]) == 0)
+		{
+			is64 = true;
+		}
 	}
 	
 	if (!interpret)
 	{
-		BFCompiler compiler(fileName, keepASM, debug);
+		BFCompiler compiler(fileName, keepASM, debug, is64);
 		compiler.translate();
 		compiler.assemble();
 
