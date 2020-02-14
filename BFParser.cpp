@@ -53,20 +53,21 @@ void BFParser::tokenise()
 				tokenSize = -tokenSize;
 			}
 			//This is unsafe af. Will change to shared_ptr when I can be bothered.
+			//std::cout << currentToken << std::endl;
 			m_tokens.push_back(new Token(currentToken, lineNumber, tokenSize, i, type));
 			
 			
 			switch (current)
 			{
 			case '[':
-				std::cout << "pushing: " << m_tokens.back() << std::endl;
+				//std::cout << "pushing: " << m_tokens.back() << std::endl;
 				bracketStack.push_back(m_tokens.back());
 				break;
 			case ']':
 				Token* open = bracketStack.back();
 				open->opposite(m_tokens.back());
 				m_tokens.back()->opposite(open);
-				std::cout << "popping: " << open << " with " << m_tokens.back() << std::endl;
+				//std::cout << "popping: " << open << " with " << m_tokens.back() << std::endl;
 				bracketStack.pop_back();
 				break;
 			}
@@ -115,45 +116,70 @@ bool BFParser::parse()
 	//I hate std iterators but it makes sense to use them here with std find.
 	for (std::vector<Token*>::iterator it = m_tokens.begin(); it != m_tokens.end(); it++)
 	{
-		if ((*it)->m_type == Token::PLUS || (*it)->m_type == Token::MINUS)
+		if ((*it)->m_type == Token::Type::PLUS || (*it)->m_type == Token::Type::MINUS)
 		{	
 			emptyMem = false;
 		}
 		if (emptyMem && (*it)->m_type == Token::LEFT_BRACKET)
 		{
-			std::cout << "here" << std::endl;
 			Token* token = (*it)->opposite();
-			std::cout << *it << " " << (*it)->opposite() << std::endl;
 			//This would take us to the end of the array if there is no opposite bracket but the parse has failed anyways.
 			it = std::find(m_tokens.begin(), m_tokens.end(), token);
 			continue;
 		}
-		/*
+		//std::cout <<  (*it)->text() << std::endl;
 		int count = (*it)->repeats();
 		Token* token = *it;
-		for (std::vector<Token*>::iterator itNext = std::advance(it, 1); itNext != m_tokens.end() &&  Token::matching((*itNext)->m_type, (*it)->m_type); itNext++, it++)
+		if (multiplicible(token->text()[0]) && m_optimise)
 		{
-			count += repeats();
-		}
-		switch (token->m_type)
-		{
-			case PLUS:
-			case MINUS:
+			std::vector<Token*>::iterator itNext = it;
+			for (itNext++; itNext != m_tokens.end() &&  Token::sameTypeOrOpposite((*itNext)->m_type, token->m_type); itNext++, it++)
 			{
-				char c = '+';
-				if (count < 0)
+				count += (*itNext)->repeats();
+			}
+			std::cout << (*it)->text() << std::endl;
+			switch (token->m_type)
+			{
+				case Token::Type::PLUS:
+				case Token::Type::MINUS:
 				{
-					c = '-';
+					char c = '+';
+					if (count < 0)
+					{
+						c = '-';
+					}
+					token->text() = "";
+					token->repeats(count);
+					for (int i = 0; i < std::abs(count); i++)
+					{
+						token->text() += c;
+					}
+					break;
 				}
-				for (int i = 0; i < count; i++)
+				case Token::Type::PTR_RIGHT:
+				case Token::Type::PTR_LEFT:
 				{
-					
+					char c = '>';
+					if (count < 0)
+					{
+						c = '<';
+					}
+					token->text() = "";
+					token->repeats(count);
+					for (int i = 0; i < std::abs(count); i++)
+					{
+						token->text() += c;
+					}
+					break;
 				}
+				default:
+					break;
+
 			}
 		}
-
-		std::cout << (*it)->text() << " size: " << (*it)->repeats() << " line: " << (*it)->lineNumber() << std::endl;
-		*/
+		m_final.push_back(*token);
+		std::cout << token->text() << " size: " << token->repeats() << " line: " << token->lineNumber() << std::endl;
+		
 	}
 }
 

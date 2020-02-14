@@ -37,26 +37,26 @@ public:
 		{
 		case PLUS:
 		case MINUS:
-			if (m2 == PLUS)
+			switch (m2)
 			{
+			case PLUS:
+			case MINUS:
 				return true;
 			}
 			break;
 		case PTR_LEFT:
 		case PTR_RIGHT:
-			if (m2 == PTR_RIGHT)
+			switch(m2)
 			{
+			case PTR_LEFT:
+			case PTR_RIGHT:
 				return true;
 			}
 			break;
 		default:
 			return false;
 		}
-	}
-
-	static inline bool matching(Type m1, Type m2)
-	{
-		return sameTypeOrOpposite(m1, m2) || sameTypeOrOpposite(m2, m1);
+		return false;
 	}
 
 	static Type tokenType(char c)
@@ -90,6 +90,10 @@ public:
 	{
 		return m_text;
 	}
+	inline std::string& text()
+	{
+		return m_text;
+	}
 	inline int lineNumber() const
 	{
 		return m_lineNumber;
@@ -98,7 +102,10 @@ public:
 	{
 		return m_repeats;
 	}
-
+	inline void repeats(int rep)
+	{
+		m_repeats = rep;
+	}
 	inline Token* opposite()
 	{
 		return m_opposite;
