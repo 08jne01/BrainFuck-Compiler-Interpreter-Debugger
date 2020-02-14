@@ -1,5 +1,5 @@
 ifndef $(PROG)
-    PROG = bfcBinary
+    PROG = bfc
 endif
 
     CC = g++
